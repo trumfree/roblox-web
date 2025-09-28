@@ -1,110 +1,94 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Roblox Presence Checker</title>
+  <meta charset="UTF-8">
+  <title>Kiểm tra trạng thái Roblox</title>
   <style>
     body {
-      font-family: Inter, Arial, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      padding: 20px;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 30px;
+      background: #f2f2f2;
     }
-    h1 { margin-bottom: 16px; }
-    input, button {
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: none;
-      margin: 4px;
+    h1 {
+      color: #e2231a;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      display: inline-block;
     }
     input {
-      min-width: 200px;
+      padding: 10px;
+      font-size: 16px;
     }
     button {
-      background: #60a5fa;
-      color: #0f172a;
-      font-weight: 600;
+      padding: 10px 15px;
+      font-size: 16px;
+      margin-left: 5px;
       cursor: pointer;
     }
-    #statusBox {
-      margin-top: 20px;
-      padding: 12px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.05);
-      min-width: 280px;
-      text-align: center;
+    img {
+      border-radius: 50%;
+      margin: 10px 0;
     }
-    .online { color: #7ef3a6; font-weight: bold; }
-    .offline { color: #f87171; font-weight: bold; }
-    .studio { color: #fbbf24; font-weight: bold; }
-    .ingame { color: #60a5fa; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>Roblox Account Checker (Realtime)</h1>
-  
-  <div>
-    <input id="userId" type="text" placeholder="Nhập UserId Roblox (vd: 1)"/>
-    <button id="startBtn">Bắt đầu theo dõi</button>
-  </div>
+  <h1>🔎 Kiểm tra trạng thái Roblox</h1>
 
-  <div id="statusBox">Chưa theo dõi tài khoản nào.</div>
+  <input type="text" id="username" placeholder="Nhập username Roblox">
+  <button onclick="checkAccount()">Kiểm tra</button>
+
+  <div id="status">⚡ Nhập username để kiểm tra</div>
 
   <script>
-    const startBtn = document.getElementById("startBtn");
-    const userIdInput = document.getElementById("userId");
-    const statusBox = document.getElementById("statusBox");
-    let evtSource = null;
-
-    function updateStatus(presence) {
-      if (!presence) {
-        statusBox.textContent = "Không lấy được dữ liệu.";
-        return;
+    // Lấy UserId từ username qua API Roblox
+    async function getUserId(username) {
+      try {
+        const res = await fetch(`https://users.roblox.com/v1/users/by-username/${username}`);
+        if (!res.ok) throw new Error("Không tìm thấy user");
+        const data = await res.json();
+        return data.id;
+      } catch (err) {
+        console.error("Lỗi lấy UserId:", err);
+        return null;
       }
-      const type = presence.userPresenceType;
-      let txt = "Offline";
-      let cls = "offline";
-
-      if (type === 1) { txt = "Online"; cls = "online"; }
-      if (type === 2) { txt = "In Studio"; cls = "studio"; }
-      if (type === 3) { txt = "In Game"; cls = "ingame"; }
-
-      statusBox.innerHTML = `
-        <div>UserId: ${presence.userId}</div>
-        <div class="${cls}">Trạng thái: ${txt}</div>
-        ${presence.lastLocation ? `<div>Last location: ${presence.lastLocation}</div>` : ""}
-      `;
     }
 
-    startBtn.addEventListener("click", () => {
-      const userId = userIdInput.value.trim();
-      if (!userId) {
-        alert("Nhập UserId Roblox trước!");
+    // Kiểm tra account Roblox
+    async function checkAccount() {
+      const username = document.getElementById("username").value.trim();
+      const statusDiv = document.getElementById("status");
+      statusDiv.innerHTML = "⏳ Đang kiểm tra...";
+
+      if (!username) {
+        statusDiv.innerHTML = "⚠️ Bạn chưa nhập username.";
         return;
       }
 
-      if (evtSource) evtSource.close();
+      const userId = await getUserId(username);
 
-      statusBox.textContent = "Đang kết nối...";
+      if (!userId) {
+        statusDiv.innerHTML = "⚠️ Không tìm thấy UserId.";
+        return;
+      }
 
-      evtSource = new EventSource(`http://localhost:3000/events?userId=${userId}`);
-      evtSource.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.error) {
-          statusBox.textContent = "Lỗi: " + data.error;
-        } else {
-          updateStatus(data);
-        }
-      };
-      evtSource.onerror = () => {
-        statusBox.textContent = "Mất kết nối server.";
-      };
-    });
+      // Avatar & Profile
+      const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${userId}&width=150&height=150&format=png`;
+      const profileUrl = `https://www.roblox.com/users/${userId}/profile`;
+
+      statusDiv.innerHTML = `
+        <img src="${avatarUrl}" alt="avatar" width="150" height="150"><br>
+        👤 <b>${username}</b> <br>
+        🆔 UserId: ${userId} <br>
+        ✅ Account tồn tại! <br>
+        🔗 <a href="${profileUrl}" target="_blank">Xem profile Roblox</a>
+      `;
+    }
   </script>
 </body>
 </html>
