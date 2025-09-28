@@ -13,11 +13,9 @@
     input[type=text]{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
     button{padding:10px 14px;border-radius:8px;border:none;background:var(--accent);color:#021124;cursor:pointer;font-weight:600}
     pre{white-space:pre-wrap;background:rgba(0,0,0,0.25);padding:12px;border-radius:8px;margin-top:12px}
-    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.02);margin-right:8px}
-    .status-online{color:#7ef3a6}
-    .status-offline{color:#f3a67e}
+    .status-online{color:#7ef3a6;font-weight:bold}
+    .status-offline{color:#f3a67e;font-weight:bold}
     footer{margin-top:14px;color:var(--muted);font-size:13px}
-    .note{margin-top:10px;color:var(--muted);font-size:13px}
   </style>
 </head>
 <body>
@@ -30,9 +28,7 @@
 
     <div id="result" style="margin-top:12px"></div>
 
-    <div class="note">Ghi chú: trang này gọi API công khai của Roblox. Một số trình duyệt hoặc chính sách CORS có thể chặn trực tiếp — nếu gặp lỗi CORS, hãy chạy qua máy chủ proxy hoặc server nhỏ (hướng dẫn phía dưới).</div>
-
-    <footer>Muốn thêm chức năng (kiểm tra trạng thái online thời gian thực, lịch sử last online, kiểm tra nhóm, hay UI React)? Tôi làm tiếp được.</footer>
+    <footer>Web này chạy qua proxy (allorigins.win) để tránh lỗi CORS.</footer>
   </div>
 
 <script>
@@ -42,79 +38,69 @@ const checkBtn = $('check');
 
 function el(tag, txt){ const e = document.createElement(tag); if(txt) e.textContent = txt; return e }
 
-async function fetchJSON(url){
-  const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
-  if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+async function fetchProxy(url){
+  const api = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+  const r = await fetch(api);
+  if(!r.ok) throw new Error("Proxy error " + r.status);
+  const data = await r.json();
+  return JSON.parse(data.contents);
 }
 
 async function checkUsername(username){
   result.innerHTML = '';
-  if(!username) return result.appendChild(el('div', 'Nhập username trước.'));
+  if(!username) return result.appendChild(el('div', '⚠️ Nhập username trước.'));
 
-  result.appendChild(el('div', 'Đang tìm...'));
+  result.appendChild(el('div', '⏳ Đang tìm...'));
 
   try{
     // 1) Lấy userId từ username
     const byNameUrl = `https://users.roblox.com/v1/users/by-username/${encodeURIComponent(username)}`;
-    const userData = await fetchJSON(byNameUrl);
+    const userData = await fetchProxy(byNameUrl);
 
     result.innerHTML = '';
     const header = el('div');
-    header.appendChild(el('span', `Username: ${userData.name} `));
-    header.appendChild(el('span', ` | DisplayName: ${userData.displayName}`));
-    header.appendChild(el('div', '\nUserId: ' + userData.id));
+    header.appendChild(el('div', `👤 Username: ${userData.name}`));
+    header.appendChild(el('div', `✨ DisplayName: ${userData.displayName}`));
+    header.appendChild(el('div', `🆔 UserId: ${userData.id}`));
     result.appendChild(header);
 
-    // 2) Lấy presence (trạng thái online / in game)
+    // 2) Lấy presence (online / offline)
     const presenceUrl = `https://presence.roblox.com/v1/presence/users?userIds=${userData.id}`;
     let presence;
-    try{
-      const p = await fetchJSON(presenceUrl);
-      presence = p && p.length ? p[0] : null;
-    }catch(e){
-      presence = null; // có thể bị CORS
-    }
-
-    const box = el('div');
-    box.style.marginTop = '8px';
+    try {
+      const p = await fetchProxy(presenceUrl);
+      presence = p.userPresences ? p.userPresences[0] : null;
+    } catch(e){ presence = null; }
 
     if(presence){
-      const type = presence.userPresenceType; // 0 = offline, 1 = online, 2 = in studio
-      const place = presence.placeId ? ` — in place ${presence.placeId}` : '';
-      const txt = type === 0 ? 'Offline' : (type === 1 ? 'Online' : 'In Studio');
-      const span = el('div', `Status: ${txt}${place}`);
+      const type = presence.userPresenceType; // 0 = offline, 1 = online, 2 = in studio, 3 = in game
+      const txt = type === 0 ? 'Offline' :
+                  type === 1 ? 'Online' :
+                  type === 2 ? 'Trong Roblox Studio' :
+                  type === 3 ? 'Đang chơi game' : 'Không rõ';
+      const span = el('div', `📡 Status: ${txt}`);
       span.className = type === 0 ? 'status-offline' : 'status-online';
-      box.appendChild(span);
+      result.appendChild(span);
     } else {
-      box.appendChild(el('div', 'Không thể lấy presence trực tiếp (có thể bị chặn bởi CORS).'));
-      box.appendChild(el('pre', 'Bạn có thể: run local server hoặc dùng proxy CORS.'));
+      result.appendChild(el('div', '⚠️ Không lấy được trạng thái (presence).'));
     }
 
-    // 3) Thêm liên kết profile
-    const profileLink = el('a', 'Mở profile trên Roblox');
+    // 3) Link profile
+    const profileLink = el('a', '🔗 Mở profile trên Roblox');
     profileLink.href = `https://www.roblox.com/users/${userData.id}/profile`;
     profileLink.target = '_blank';
     profileLink.style.display = 'block';
     profileLink.style.marginTop = '8px';
-    box.appendChild(profileLink);
-
-    result.appendChild(box);
+    result.appendChild(profileLink);
 
   }catch(err){
     result.innerHTML = '';
-    if(err.message.includes('404')){
-      result.appendChild(el('div', 'Không tìm thấy user (username không tồn tại).'));
-    } else {
-      result.appendChild(el('div', 'Lỗi khi gọi API: ' + err.message));
-      result.appendChild(el('pre', 'Nếu thấy lỗi CORS, chạy file này trên server local (ví dụ: `npx http-server .`) hoặc dùng proxy.'));
-    }
+    result.appendChild(el('div', '❌ Lỗi: ' + err.message));
   }
 }
 
 checkBtn.addEventListener('click', ()=> checkUsername($('username').value.trim()));
 $('username').addEventListener('keypress', e => { if(e.key==='Enter') checkUsername($('username').value.trim()) });
-
 </script>
 </body>
 </html>
