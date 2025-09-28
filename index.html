@@ -4,37 +4,14 @@
   <meta charset="UTF-8">
   <title>Kiểm tra trạng thái Roblox</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 30px;
-      background: #f2f2f2;
-    }
-    h1 {
-      color: #e2231a;
-    }
-    #status {
-      margin-top: 20px;
-      padding: 20px;
-      border-radius: 10px;
-      background: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      display: inline-block;
-    }
-    input {
-      padding: 10px;
-      font-size: 16px;
-    }
-    button {
-      padding: 10px 15px;
-      font-size: 16px;
-      margin-left: 5px;
-      cursor: pointer;
-    }
-    img {
-      border-radius: 50%;
-      margin: 10px 0;
-    }
+    body {font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #f2f2f2;}
+    h1 {color: #e2231a;}
+    #status {margin-top: 20px; padding: 20px; border-radius: 10px; background: white;
+             box-shadow: 0 2px 6px rgba(0,0,0,0.2); display: inline-block;}
+    input {padding: 10px; font-size: 16px;}
+    button {padding: 10px 15px; font-size: 16px; margin-left: 5px; cursor: pointer;}
+    img {border-radius: 50%; margin: 10px 0;}
+    pre {text-align:left; background:#eee; padding:10px; border-radius:6px; max-height:200px; overflow:auto;}
   </style>
 </head>
 <body>
@@ -46,12 +23,18 @@
   <div id="status">⚡ Nhập username để kiểm tra</div>
 
   <script>
-    // Lấy UserId từ username qua API Roblox
     async function getUserId(username) {
       try {
-        const res = await fetch(`https://users.roblox.com/v1/users/by-username/${username}`);
-        if (!res.ok) throw new Error("Không tìm thấy user");
+        const url = `https://users.roblox.com/v1/users/by-username?username=${encodeURIComponent(username)}`;
+        const res = await fetch(url);
         const data = await res.json();
+
+        // Debug log
+        console.log("API trả về:", data);
+
+        if (!res.ok || data.errors) {
+          throw new Error(data.errors ? data.errors[0].message : res.statusText);
+        }
         return data.id;
       } catch (err) {
         console.error("Lỗi lấy UserId:", err);
@@ -59,7 +42,6 @@
       }
     }
 
-    // Kiểm tra account Roblox
     async function checkAccount() {
       const username = document.getElementById("username").value.trim();
       const statusDiv = document.getElementById("status");
@@ -73,11 +55,10 @@
       const userId = await getUserId(username);
 
       if (!userId) {
-        statusDiv.innerHTML = "⚠️ Không tìm thấy UserId.";
+        statusDiv.innerHTML = "⚠️ Không tìm thấy UserId. <br>Kiểm tra lại username hoặc mở console (F12) để xem log chi tiết.";
         return;
       }
 
-      // Avatar & Profile
       const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${userId}&width=150&height=150&format=png`;
       const profileUrl = `https://www.roblox.com/users/${userId}/profile`;
 
