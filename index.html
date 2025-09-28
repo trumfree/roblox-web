@@ -1,105 +1,110 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Roblox Account Checker</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Roblox Presence Checker</title>
   <style>
-    :root{--bg:#0f1724;--card:#0b1220;--accent:#60a5fa;--muted:#94a3b8;color-scheme:dark}
-    body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:linear-gradient(180deg,#071024 0%,#071226 100%);color:#e6eef8;display:flex;align-items:center;justify-content:center;height:100vh}
-    .card{width:920px;max-width:95%;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:20px;box-shadow:0 8px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
-    h1{margin:0 0 12px 0;font-size:22px;text-align:center}
-    .row{display:flex;gap:12px;align-items:center;justify-content:center}
-    input[type=text]{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;min-width:200px}
-    button{padding:10px 14px;border-radius:8px;border:none;background:var(--accent);color:#021124;cursor:pointer;font-weight:600}
-    .profile{margin-top:16px;text-align:center}
-    .profile img{border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
-    .status-online{color:#7ef3a6;font-weight:bold}
-    .status-offline{color:#f3a67e;font-weight:bold}
-    footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 16px; }
+    input, button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      margin: 4px;
+    }
+    input {
+      min-width: 200px;
+    }
+    button {
+      background: #60a5fa;
+      color: #0f172a;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #statusBox {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      min-width: 280px;
+      text-align: center;
+    }
+    .online { color: #7ef3a6; font-weight: bold; }
+    .offline { color: #f87171; font-weight: bold; }
+    .studio { color: #fbbf24; font-weight: bold; }
+    .ingame { color: #60a5fa; font-weight: bold; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>🔎 Roblox Account Checker</h1>
-    <div class="row">
-      <input id="username" type="text" placeholder="Nhập username Roblox (ví dụ: Builderman)" />
-      <button id="check">Kiểm tra</button>
-    </div>
-
-    <div id="result"></div>
-
-    <footer>Web này dùng proxy để tránh lỗi CORS. API: users.roblox.com & presence.roblox.com</footer>
+  <h1>Roblox Account Checker (Realtime)</h1>
+  
+  <div>
+    <input id="userId" type="text" placeholder="Nhập UserId Roblox (vd: 1)"/>
+    <button id="startBtn">Bắt đầu theo dõi</button>
   </div>
 
-<script>
-const $ = id => document.getElementById(id);
-const result = $('result');
-const checkBtn = $('check');
+  <div id="statusBox">Chưa theo dõi tài khoản nào.</div>
 
-// Gọi API qua proxy (tránh CORS)
-async function fetchProxy(url){
-  const api = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  const r = await fetch(api);
-  if(!r.ok) throw new Error("Proxy error " + r.status);
-  const data = await r.json();
-  return JSON.parse(data.contents);
-}
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const userIdInput = document.getElementById("userId");
+    const statusBox = document.getElementById("statusBox");
+    let evtSource = null;
 
-async function checkUsername(username){
-  result.innerHTML = '';
-  if(!username){
-    result.innerHTML = '<div>⚠️ Nhập username trước.</div>';
-    return;
-  }
+    function updateStatus(presence) {
+      if (!presence) {
+        statusBox.textContent = "Không lấy được dữ liệu.";
+        return;
+      }
+      const type = presence.userPresenceType;
+      let txt = "Offline";
+      let cls = "offline";
 
-  result.innerHTML = '<div>⏳ Đang kiểm tra...</div>';
+      if (type === 1) { txt = "Online"; cls = "online"; }
+      if (type === 2) { txt = "In Studio"; cls = "studio"; }
+      if (type === 3) { txt = "In Game"; cls = "ingame"; }
 
-  try {
-    // 1) Lấy thông tin user
-    const byNameUrl = `https://users.roblox.com/v1/users/by-username/${encodeURIComponent(username)}`;
-    const userData = await fetchProxy(byNameUrl);
-
-    result.innerHTML = `
-      <div class="profile">
-        <img src="https://www.roblox.com/headshot-thumbnail/image?userId=${userData.id}&width=150&height=150&format=png" alt="Avatar Roblox">
-        <h2>${userData.name} (${userData.displayName})</h2>
-        <p>🆔 UserId: ${userData.id}</p>
-      </div>
-    `;
-
-    // 2) Lấy trạng thái online/offline
-    const presenceUrl = `https://presence.roblox.com/v1/presence/users?userIds=${userData.id}`;
-    let presence;
-    try {
-      const p = await fetchProxy(presenceUrl);
-      presence = p.userPresences ? p.userPresences[0] : null;
-    } catch(e){ presence = null; }
-
-    if(presence){
-      const type = presence.userPresenceType; 
-      const txt = type === 0 ? 'Offline' :
-                  type === 1 ? 'Online' :
-                  type === 2 ? 'Trong Roblox Studio' :
-                  type === 3 ? 'Đang chơi game' : 'Không rõ';
-      const cls = type === 0 ? 'status-offline' : 'status-online';
-      result.innerHTML += `<p class="${cls}">📡 Status: ${txt}</p>`;
-    } else {
-      result.innerHTML += `<p>⚠️ Không lấy được trạng thái.</p>`;
+      statusBox.innerHTML = `
+        <div>UserId: ${presence.userId}</div>
+        <div class="${cls}">Trạng thái: ${txt}</div>
+        ${presence.lastLocation ? `<div>Last location: ${presence.lastLocation}</div>` : ""}
+      `;
     }
 
-    // 3) Link profile
-    result.innerHTML += `
-      <p><a href="https://www.roblox.com/users/${userData.id}/profile" target="_blank">🔗 Xem profile Roblox</a></p>
-    `;
+    startBtn.addEventListener("click", () => {
+      const userId = userIdInput.value.trim();
+      if (!userId) {
+        alert("Nhập UserId Roblox trước!");
+        return;
+      }
 
-  } catch(err){
-    result.innerHTML = `<div>❌ Lỗi: ${err.message}</div>`;
-  }
-}
+      if (evtSource) evtSource.close();
 
-checkBtn.addEventListener('click', ()=> checkUsername($('username').value.trim()));
-$('username').addEventListener('keypress', e => { if(e.key==='Enter') checkUsername($('username').value.trim()) });
-</script>
+      statusBox.textContent = "Đang kết nối...";
+
+      evtSource = new EventSource(`http://localhost:3000/events?userId=${userId}`);
+      evtSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.error) {
+          statusBox.textContent = "Lỗi: " + data.error;
+        } else {
+          updateStatus(data);
+        }
+      };
+      evtSource.onerror = () => {
+        statusBox.textContent = "Mất kết nối server.";
+      };
+    });
+  </script>
 </body>
 </html>
